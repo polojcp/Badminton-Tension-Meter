@@ -235,3 +235,456 @@
         // --- String Database ---
         const STRINGS = {
             'custom': { name: 'Custom', gauge: 0.68 },
+            
+            // Yonex
+            'y_as': { name: 'Aerosonic', gauge: 0.61 },
+            'y_xb63': { name: 'Exbolt 63', gauge: 0.63 },
+            'y_xb65': { name: 'Exbolt 65', gauge: 0.65 },
+            'y_xb68': { name: 'Exbolt 68', gauge: 0.68 },
+            'y_bg66um': { name: 'BG66 Ultimax', gauge: 0.65 },
+            'y_bg66f': { name: 'BG66 Force', gauge: 0.65 },
+            'y_bg80': { name: 'BG80', gauge: 0.68 },
+            'y_bg80p': { name: 'BG80 Power', gauge: 0.68 },
+            'y_bg65': { name: 'BG65', gauge: 0.70 },
+            'y_bg65ti': { name: 'BG65 Ti', gauge: 0.70 },
+            'y_nbg95': { name: 'Nanogy 95', gauge: 0.69 },
+            'y_nbg98': { name: 'Nanogy 98', gauge: 0.66 },
+            'y_nbg99': { name: 'Nanogy 99', gauge: 0.69 },
+            'y_ab_main': { name: 'Aerobite (Main)', gauge: 0.67 }, // PU Coating
+            'y_ab_cross': { name: 'Aerobite (Cross)', gauge: 0.61 },
+            'y_abb_main': { name: 'AB Boost (Main)', gauge: 0.72 },
+            
+            // Victor
+            'v_vbs63': { name: 'VBS-63', gauge: 0.63 },
+            'v_vbs66n': { name: 'VBS-66N', gauge: 0.66 },
+            'v_vbs68': { name: 'VBS-68', gauge: 0.68 },
+            'v_vbs70': { name: 'VBS-70', gauge: 0.70 },
+            
+            // Kizuna
+            'k_z58': { name: 'Z58', gauge: 0.58 },
+            'k_z61': { name: 'Z61 / D61', gauge: 0.61 },
+            'k_z63': { name: 'Z63 / X63', gauge: 0.63 },
+            'k_z64': { name: 'Z64', gauge: 0.64 },
+            'k_z65': { name: 'Z65', gauge: 0.65 },
+            'k_z69': { name: 'Z69', gauge: 0.69 },
+        };
+
+        const GROUPS = {
+            'Yonex': ['y_as', 'y_xb63', 'y_xb65', 'y_xb68', 'y_bg66um', 'y_bg66f', 'y_bg80', 'y_bg80p', 'y_bg65', 'y_bg65ti', 'y_nbg95', 'y_nbg98', 'y_ab_main', 'y_ab_cross'],
+            'Victor': ['v_vbs63', 'v_vbs66n', 'v_vbs68', 'v_vbs70'],
+            'Kizuna': ['k_z58', 'k_z61', 'k_z63', 'k_z64', 'k_z65', 'k_z69']
+        };
+
+        // --- Audio State Variables ---
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let isListening = false;
+        let animationId = null;
+
+        let mainGauge = 0.68;
+        let crossGauge = 0.68;
+        let preStretchPercent = 0;
+        let calibrationFactor = 1.0;
+        
+        // Geometry defaults
+        let currentLength = 0.245; 
+        let currentWidth = 0.185; 
+        
+        // Stabilizing readings
+        let readingHistory = [];
+        const HISTORY_SIZE = 5;
+
+        // Racket Database
+        const RACKETS = {
+            'ax100zz': { l: 24.0, w: 18.2 }, 
+            'ax99pro': { l: 24.5, w: 18.5 },
+            'ax77pro': { l: 24.5, w: 18.5 },
+            'arc11':   { l: 24.5, w: 18.5 },
+            'arc11pro':{ l: 24.5, w: 18.5 },
+            'arc7pro': { l: 24.5, w: 18.5 },
+            'nf1000z': { l: 24.0, w: 18.3 },
+            'nf700pro':{ l: 24.5, w: 18.7 },
+            'nf270':   { l: 24.5, w: 18.5 },
+            'ns9000':  { l: 24.5, w: 18.5 },
+            'iso600':  { l: 24.5, w: 18.5 },
+            'cab20':   { l: 23.5, w: 17.5 },
+            'ars_hs':  { l: 24.0, w: 18.3 },
+            'ars90k2': { l: 24.3, w: 18.4 },
+            'dx10':    { l: 24.5, w: 18.5 },
+            'tkf':     { l: 24.4, w: 18.4 },
+            'ars_fan': { l: 24.5, w: 18.5 },
+            'redson_shape': { l: 24.0, w: 18.7 },
+            'redson_beta':  { l: 24.5, w: 18.5 },
+            'felet_88': { l: 24.5, w: 18.7 },
+            'fleet_stellar': { l: 24.5, w: 18.5 },
+            'fleet_tri':     { l: 24.5, w: 18.5 },
+            'fly_term':      { l: 24.5, w: 18.5 },
+            'jnice_air':     { l: 24.5, w: 18.5 },
+            'jnice_elves':   { l: 24.5, w: 18.5 },
+            'jnice_panther': { l: 24.5, w: 18.5 }
+        };
+
+        // UI Elements
+        const toggleBtn = document.getElementById('toggle-btn');
+        const tensionDisplay = document.getElementById('tension-value');
+        const hzDisplay = document.getElementById('hz-value');
+        const configSummary = document.getElementById('config-summary');
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+        const circleDisplay = document.getElementById('circle-display');
+        const mainSelect = document.getElementById('main-string-select');
+        const crossSelect = document.getElementById('cross-string-select');
+        const lengthDisplay = document.getElementById('length-display');
+        const widthDisplay = document.getElementById('width-display');
+        const lengthSlider = document.getElementById('length-slider');
+        const widthSlider = document.getElementById('width-slider');
+        const racketSelectEl = document.getElementById('racket-select');
+        const manualMainGauge = document.getElementById('manual-main-gauge');
+        const manualCrossGauge = document.getElementById('manual-cross-gauge');
+
+        // Init Gauge Dropdown
+        function initDropdown() {
+            let optionsHTML = `<option value="custom">Custom / Manual</option>`;
+            
+            for (const [brand, keys] of Object.entries(GROUPS)) {
+                optionsHTML += `<optgroup label="${brand}">`;
+                keys.forEach(key => {
+                    const s = STRINGS[key];
+                    // Select BG80 by default for example
+                    let selected = key === 'y_bg80' ? 'selected' : '';
+                    optionsHTML += `<option value="${key}" ${selected}>${s.name} (${s.gauge}mm)</option>`;
+                });
+                optionsHTML += `</optgroup>`;
+            }
+
+            mainSelect.innerHTML = optionsHTML;
+            // Re-select for cross (BG80 default)
+            crossSelect.innerHTML = optionsHTML;
+            
+            // Set initial inputs
+            manualMainGauge.value = 0.68;
+            manualCrossGauge.value = 0.68;
+            updateSummary();
+        }
+        initDropdown();
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- Racket Logic ---
+        function selectRacket(val) {
+            if (val === 'custom') {
+                currentLength = parseFloat(lengthSlider.value) / 100;
+                currentWidth = parseFloat(widthSlider.value) / 100;
+            } else {
+                const specs = RACKETS[val];
+                if (specs) {
+                    currentLength = specs.l / 100;
+                    currentWidth = specs.w / 100;
+                    lengthSlider.value = specs.l;
+                    widthSlider.value = specs.w;
+                    lengthDisplay.textContent = specs.l + " cm";
+                    widthDisplay.textContent = specs.w + " cm";
+                }
+            }
+            clearReadings();
+        }
+
+        // --- String Logic ---
+        function setMainString(key) {
+            const s = STRINGS[key];
+            if (s) {
+                mainGauge = s.gauge;
+                manualMainGauge.value = s.gauge;
+            }
+            clearReadings();
+            updateSummary();
+        }
+
+        function setCrossString(key) {
+            const s = STRINGS[key];
+            if (s) {
+                crossGauge = s.gauge;
+                manualCrossGauge.value = s.gauge;
+            }
+            clearReadings();
+            updateSummary();
+        }
+
+        function manualGaugeUpdate(type, val) {
+            const floatVal = parseFloat(val);
+            if (isNaN(floatVal)) return;
+
+            if (type === 'main') {
+                mainGauge = floatVal;
+                // Set dropdown to custom
+                mainSelect.value = 'custom';
+            } else {
+                crossGauge = floatVal;
+                crossSelect.value = 'custom';
+            }
+            clearReadings();
+            updateSummary();
+        }
+
+        function setPreStretch(val) {
+            preStretchPercent = parseInt(val);
+            clearReadings();
+            updateSummary();
+        }
+        
+        function updateSummary() {
+            let text = "";
+            // Find string names if possible
+            const mainName = mainSelect.value === 'custom' ? 'Custom' : STRINGS[mainSelect.value].name;
+            const crossName = crossSelect.value === 'custom' ? 'Custom' : STRINGS[crossSelect.value].name;
+
+            if (mainGauge === crossGauge && mainSelect.value === crossSelect.value) {
+                text = `${mainName} (${mainGauge}mm)`;
+            } else {
+                text = `${mainGauge}mm / ${crossGauge}mm`;
+            }
+            text += ` @ ${preStretchPercent}% PS`;
+            
+            configSummary.textContent = text;
+            configSummary.classList.remove('opacity-0');
+        }
+
+        function clearReadings() {
+            readingHistory = [];
+            tensionDisplay.textContent = "--";
+            hzDisplay.textContent = "Settings changed. Tap again.";
+            // Reset color
+            hzDisplay.className = "text-sm font-mono text-slate-400";
+        }
+
+        function toggleSettings() {
+            document.getElementById('settings-panel').classList.toggle('hidden');
+        }
+
+        function updateLength(val) {
+            currentLength = parseFloat(val) / 100; 
+            lengthDisplay.textContent = val + " cm";
+            racketSelectEl.value = 'custom';
+            clearReadings();
+        }
+
+        function updateWidth(val) {
+            currentWidth = parseFloat(val) / 100; 
+            widthDisplay.textContent = val + " cm";
+            racketSelectEl.value = 'custom';
+            clearReadings();
+        }
+
+        function updateFactor(val) {
+            calibrationFactor = parseFloat(val);
+            const factorText = document.getElementById('factor-display');
+            if(factorText) factorText.textContent = val + "x";
+            clearReadings();
+        }
+
+        // --- Audio Logic ---
+
+        async function startListening() {
+            // Enhanced Error Handling for Local Files
+            if (!window.isSecureContext) {
+                hzDisplay.innerHTML = '<span class="text-rose-500 font-bold">Error: Insecure Context</span>';
+                alert("Security Restriction: Microphone access requires a secure website (HTTPS) or localhost. \n\nIt will NOT work if opened directly as a local file (file://) on Android due to OS security.");
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                hzDisplay.innerHTML = '<span class="text-rose-500 font-bold">Error: API Not Supported</span>';
+                alert("Browser Error: Audio API not supported in this specific browser context.");
+                return;
+            }
+
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                microphone = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 4096; 
+                microphone.connect(analyser);
+
+                isListening = true;
+                toggleBtn.innerHTML = `
+                    <svg class="animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12"/><path d="M6 12h12"/></svg>
+                    <span>Listening...</span>
+                `;
+                toggleBtn.classList.add('bg-rose-500', 'hover:bg-rose-600');
+                toggleBtn.classList.remove('meter-gradient');
+                
+                canvas.classList.remove('opacity-0');
+                
+                // Clear any previous error messages
+                hzDisplay.className = "text-sm font-mono text-slate-400";
+                hzDisplay.textContent = "Listening...";
+                
+                processAudio();
+
+            } catch (err) {
+                console.error(err);
+                
+                let userMsg = "Microphone access denied.";
+                let shortMsg = "Error";
+
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    userMsg = "Permission Denied: You must click 'Allow' to use the microphone.";
+                    shortMsg = "Permission Denied";
+                } else if (err.name === 'NotFoundError') {
+                    userMsg = "No microphone found on this device.";
+                    shortMsg = "No Mic Found";
+                }
+                
+                alert(userMsg + "\n\nTechnical details: " + err.message);
+                
+                hzDisplay.innerHTML = `<span class="text-rose-500 font-bold">${shortMsg}</span>`;
+            }
+        }
+
+        function stopListening() {
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            isListening = false;
+            cancelAnimationFrame(animationId);
+            
+            toggleBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                <span>Start Microphone</span>
+            `;
+            toggleBtn.classList.remove('bg-rose-500', 'hover:bg-rose-600');
+            toggleBtn.classList.add('meter-gradient');
+            canvas.classList.add('opacity-0');
+            hzDisplay.textContent = "Stopped.";
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            if (isListening) stopListening();
+            else startListening();
+        });
+
+        // --- Signal Processing ---
+
+        function calculateTension(frequency) {
+            const r_main = (mainGauge / 1000) / 2;
+            const area_main = Math.PI * (r_main * r_main);
+            
+            const r_cross = (crossGauge / 1000) / 2;
+            const area_cross = Math.PI * (r_cross * r_cross);
+            
+            const avgArea = (area_main + area_cross) / 2;
+            
+            const stretchFactor = 1 + (preStretchPercent / 100);
+            const preStretchMassFactor = 1 / stretchFactor;
+            
+            const linearMassKgPerM = (MATERIAL_DENSITY * avgArea) * preStretchMassFactor;
+
+            const effectiveL = currentLength;
+            
+            const standardWidth = 0.185;
+            const shapeFactor = 1 + 0.5 * ((currentWidth - standardWidth) / standardWidth);
+            
+            let tensionNewtons = 4 * linearMassKgPerM * (effectiveL * effectiveL) * (frequency * frequency);
+            tensionNewtons = tensionNewtons * shapeFactor;
+
+            let tensionLbs = tensionNewtons * 0.224809;
+            tensionLbs = tensionLbs * calibrationFactor;
+
+            return tensionLbs;
+        }
+
+        function processAudio() {
+            if (!isListening) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = (canvas.width / 2) - 10;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.stroke();
+
+            let sum = 0;
+            for(let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / bufferLength;
+            const scale = 1 + (average / 50); 
+            
+            if (average > 10) {
+                 circleDisplay.style.transform = `scale(${Math.min(scale, 1.1)})`;
+                 circleDisplay.style.borderColor = '#10b981';
+            } else {
+                 circleDisplay.style.transform = 'scale(1)';
+                 circleDisplay.style.borderColor = '#f1f5f9';
+            }
+
+            const sampleRate = audioContext.sampleRate;
+            let maxVal = 0;
+            let maxIndex = 0;
+
+            const minIndex = Math.floor(800 * 2 * bufferLength / sampleRate);
+            const maxIndexSearch = Math.floor(1600 * 2 * bufferLength / sampleRate);
+
+            for (let i = minIndex; i < maxIndexSearch; i++) {
+                if (dataArray[i] > maxVal) {
+                    maxVal = dataArray[i];
+                    maxIndex = i;
+                }
+            }
+
+            if (maxVal > 150) { 
+                const prev = dataArray[maxIndex - 1];
+                const curr = dataArray[maxIndex];
+                const next = dataArray[maxIndex + 1];
+                
+                const delta = 0.5 * (prev - next) / (prev - 2*curr + next);
+                const trueIndex = maxIndex + delta;
+                const freq = trueIndex * sampleRate / (2 * bufferLength);
+
+                updateReading(freq);
+            }
+
+            animationId = requestAnimationFrame(processAudio);
+        }
+
+        function updateReading(freq) {
+            if (readingHistory.length > 0) {
+                const last = readingHistory[readingHistory.length - 1];
+                if (Math.abs(last - freq) > 50) {
+                    readingHistory = [freq];
+                } else {
+                    readingHistory.push(freq);
+                }
+            } else {
+                readingHistory.push(freq);
+            }
+
+            if (readingHistory.length > HISTORY_SIZE) {
+                readingHistory.shift();
+            }
+
+            const avgFreq = readingHistory.reduce((a, b) => a + b, 0) / readingHistory.length;
+            const lbs = calculateTension(avgFreq);
+
+            hzDisplay.textContent = `${Math.round(avgFreq)} Hz`;
+            tensionDisplay.textContent = lbs.toFixed(1);
+        }
+    </script>
+</body>
+</html>
